@@ -2766,7 +2766,7 @@ func testServer_HeaderTableSizeDuringWrite(t testing.TB) {
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {})
 	defer st.Close()
 	st.greet()
-	enc := st.sc.TestHPACKEncoder()
+	enc := st.sc.hpackEncoder
 
 	// Leave the response HEADERS write for stream 1 in progress while the
 	// client changes SETTINGS_HEADER_TABLE_SIZE twice.
@@ -2779,7 +2779,7 @@ func testServer_HeaderTableSizeDuringWrite(t testing.TB) {
 	// Table size should not be changed immediately. To avoid concurrent use of
 	// the encoder, we apply the size change right before we use the encoder to
 	// write frames.
-	if got, want := enc.MaxDynamicTableSize(), uint32(InitialHeaderTableSize); got != want {
+	if got, want := enc.MaxDynamicTableSize(), uint32(initialHeaderTableSize); got != want {
 		t.Errorf("during frame write: encoder header table size = %d, want %d", got, want)
 	}
 	st.cc.(*synctestNetConn).SetReadBufferSize(math.MaxInt)
