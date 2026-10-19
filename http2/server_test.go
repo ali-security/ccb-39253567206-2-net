@@ -3924,7 +3924,7 @@ func TestServerResetStreamUnreadBody(t *testing.T) {
 		})
 		call := st.nextHandlerCall()
 
-		const size = InflowMinRefresh
+		const size = inflowMinRefresh
 		st.writeData(1, false, make([]byte, size))
 		st.writeRSTStream(1, ErrCodeCancel)
 		st.sync()
@@ -3952,7 +3952,7 @@ func TestServerResetStreamUnreadBody(t *testing.T) {
 		})
 		call := st.nextHandlerCall()
 
-		const size = InflowMinRefresh
+		const size = inflowMinRefresh
 		st.writeData(1, false, make([]byte, size))
 		st.writeRSTStream(1, ErrCodeCancel)
 		st.sync()
@@ -3975,7 +3975,7 @@ func TestServerResetStreamUnreadBody(t *testing.T) {
 		})
 		call := st.nextHandlerCall()
 
-		const size = InflowMinRefresh
+		const size = inflowMinRefresh
 		st.writeData(1, false, make([]byte, size))
 		synctest.Wait()
 
@@ -4029,7 +4029,7 @@ func TestServerResetStreamUnreadBody(t *testing.T) {
 			EndHeaders:    true,
 		})
 
-		const size = InflowMinRefresh
+		const size = inflowMinRefresh
 		st.writeData(3, false, make([]byte, size))
 		st.writeRSTStream(3, ErrCodeCancel)
 		st.wantIdle()
@@ -4060,7 +4060,7 @@ func TestServerResetStreamUnreadBody(t *testing.T) {
 			r.Body = http.MaxBytesReader(w, r.Body, 1000)
 		})
 
-		const size = InflowMinRefresh
+		const size = inflowMinRefresh
 		st.writeData(1, false, make([]byte, size))
 		st.writeRSTStream(1, ErrCodeCancel)
 		st.sync()
