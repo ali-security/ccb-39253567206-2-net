@@ -1,0 +1,96 @@
+# Added for the ali-security patched build: upstream golang.org/x/net is tested
+# on LUCI (build.golang.org) and has no GitHub Actions workflows of its own.
+name: ci
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.24.x', '1.25.x']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      # http2 tests require testing/synctest (GOEXPERIMENT=synctest on go1.24).
+      GOEXPERIMENT: ${{ matrix.go == '1.24.x' && 'synctest' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+      - run: go version
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go test -race ./html/... ./idna/... ./http2/...
+        if: runner.os == 'Linux'
+
+  module:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Build module zip (proxy format)
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=v0.45.0
+          SRC="$RUNNER_TEMP/src"
+          OUT="$GITHUB_WORKSPACE/dist"
+          mkdir -p "$SRC" "$OUT" "$RUNNER_TEMP/mkzip"
+          git archive HEAD | tar -x -C "$SRC"
+          rm -rf "$SRC/.github"
+          cd "$RUNNER_TEMP/mkzip"
+          cat > main.go <<'GO'
+          package main
+
+          import (
+          	"os"
+
+          	"golang.org/x/mod/module"
+          	"golang.org/x/mod/zip"
+          )
+
+          func main() {
+          	f, err := os.Create(os.Args[3])
+          	if err != nil {
+          		panic(err)
+          	}
+          	defer f.Close()
+          	mv := module.Version{Path: "golang.org/x/net", Version: os.Args[2]}
+          	if err := zip.CreateFromDir(f, mv, os.Args[1]); err != nil {
+          		panic(err)
+          	}
+          }
+          GO
+          go mod init mkzip
+          go get golang.org/x/mod@v0.28.0
+          go run . "$SRC" "$VERSION" "$OUT/$VERSION.zip"
+          cp "$SRC/go.mod" "$OUT/$VERSION.mod"
+          TS=$(git -C "$GITHUB_WORKSPACE" log -1 --format=%cI "$VERSION" 2>/dev/null || git -C "$GITHUB_WORKSPACE" log -1 --format=%cI HEAD)
+          printf '{"Version":"%s","Time":"%s"}\n' "$VERSION" "$(date -u -d "$TS" +%Y-%m-%dT%H:%M:%SZ)" > "$OUT/$VERSION.info"
+          (cd "$OUT" && sha256sum * > SHA256SUMS)
+          ls -l "$OUT"
+      - name: Verify module zip builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/verify" && cd "$RUNNER_TEMP/verify"
+          unzip -q "$GITHUB_WORKSPACE/dist/v0.45.0.zip"
+          cd golang.org/x/net@v0.45.0 && go build ./...
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golang.org-x-net-v0.45.0-patched
+          path: dist/
